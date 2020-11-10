@@ -18,8 +18,9 @@ func CopyFromRows(rows [][]interface{}) CopyFromSource {
 }
 
 type copyFromRows struct {
-	rows [][]interface{}
-	idx  int
+	rows       [][]interface{}
+	idx        int
+	bufferSize int
 }
 
 func (ctr *copyFromRows) Next() bool {
@@ -33,6 +34,12 @@ func (ctr *copyFromRows) Values() ([]interface{}, error) {
 
 func (ctr *copyFromRows) Err() error {
 	return nil
+}
+func (ctr *copyFromRows) GetBufferSize() int {
+	if ctr.bufferSize == 0 {
+		return 65535
+	}
+	return ctr.bufferSize
 }
 
 // CopyFromSource is the interface used by *Conn.CopyFrom as the source for copy data.
@@ -48,6 +55,9 @@ type CopyFromSource interface {
 	// Err returns any error that has been encountered by the CopyFromSource. If
 	// this is not nil *Conn.CopyFrom will abort the copy.
 	Err() error
+
+	// GetBufferSize returns copy buffer cache size
+	GetBufferSize() int
 }
 
 type copyFrom struct {
@@ -142,7 +152,7 @@ func (ct *copyFrom) buildCopyBuf(buf []byte, sd *pgconn.StatementDescription) (b
 			}
 		}
 
-		if len(buf) > 65536 {
+		if len(buf) > ct.rowSrc.GetBufferSize() {
 			return true, buf, nil
 		}
 	}
